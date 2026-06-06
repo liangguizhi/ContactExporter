@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Contacts→CSV" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>Contacts → CSV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #13131a;
+      --border:    #22222e;
+      --accent:    #c8f060;
+      --accent2:   #60c8f0;
+      --text:      #e8e8f0;
+      --muted:     #6b6b80;
+      --danger:    #f06060;
+      --radius:    14px;
+      --mono:      'DM Mono', monospace;
+      --serif:     'Instrument Serif', Georgia, serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .35;
+      pointer-events: none;
+    }
+
+    /* ── Glow blob ── */
+    body::after {
+      content: '';
+      position: fixed;
+      width: 600px; height: 600px;
+      top: -200px; left: 50%;
+      transform: translateX(-50%);
+      background: radial-gradient(circle, rgba(200,240,96,.07) 0%, transparent 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    #app {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 0 16px env(safe-area-inset-bottom, 16px);
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 56px 0 32px;
+      text-align: center;
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 6px 14px;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .logo-badge span { color: var(--accent); }
+
+    h1 {
+      font-family: var(--serif);
+      font-size: clamp(2.2rem, 8vw, 3.2rem);
+      font-style: italic;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    h1 em { color: var(--accent); font-style: normal; }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 340px;
+      margin: 0 auto;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+
+    .card-label {
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Step panels ── */
+    .step {
+      transition: opacity .3s, transform .3s;
+    }
+    .step.hidden {
+      display: none;
+    }
+
+    /* ── Button ── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 16px 24px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform .15s, opacity .15s, box-shadow .15s;
+      letter-spacing: .02em;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #0a0a0f;
+      box-shadow: 0 0 32px rgba(200,240,96,.25);
+    }
+    .btn-primary:hover { box-shadow: 0 0 48px rgba(200,240,96,.4); }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--muted); }
+
+    .btn-export {
+      background: var(--accent2);
+      color: #0a0a0f;
+      box-shadow: 0 0 32px rgba(96,200,240,.25);
+    }
+    .btn-export:hover { box-shadow: 0 0 48px rgba(96,200,240,.4); }
+
+    /* ── Stat bar ── */
+    .stat-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 22px;
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    /* ── Contact list preview ── */
+    .contact-list {
+      max-height: 320px;
+      overflow-y: auto;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .contact-list::-webkit-scrollbar { width: 4px; }
+    .contact-list::-webkit-scrollbar-track { background: transparent; }
+    .contact-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+    .contact-item {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp .25s ease both;
+    }
+    .contact-item:last-child { border-bottom: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 15px;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .contact-info .name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .contact-info .detail {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 99px;
+      transition: width .4s ease;
+    }
+
+    /* ── Notice box ── */
+    .notice {
+      background: rgba(200,240,96,.06);
+      border: 1px solid rgba(200,240,96,.2);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+    .notice strong { color: var(--accent); }
+
+    .notice-warn {
+      background: rgba(240,96,96,.06);
+      border-color: rgba(240,96,96,.2);
+    }
+    .notice-warn strong { color: var(--danger); }
+
+    /* ── Search ── */
+    .search-wrap {
+      position: relative;
+      margin-bottom: 12px;
+    }
+    .search-wrap svg {
+      position: absolute;
+      left: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+    input[type=search] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px 10px 36px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type=search]:focus { border-color: var(--accent); }
+    input[type=search]::placeholder { color: var(--muted); }
+    input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px 0 24px;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .05em;
+    }
+    footer a { color: var(--muted); }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(10,10,15,.3);
+      border-top-color: #0a0a0f;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── CSV preview table ── */
+    .csv-preview {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    th {
+      background: var(--surface);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 10px;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    td {
+      padding: 7px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      white-space: nowrap;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo-badge">📱 <span>iOS</span> · Contacts Exporter</div>
+    <h1>Export your<br>contacts to <em>CSV</em></h1>
+    <p class="subtitle">Pick contacts directly on your iPhone and download a clean CSV — no app install needed.</p>
+  </header>
+
+  <!-- ── Step 1: Pick contacts ── -->
+  <div id="step-pick" class="step">
+    <div class="notice">
+      <strong>How it works:</strong> Tap the button below → your iPhone shows its native contact picker → choose individual contacts or select all → a CSV downloads instantly.<br><br>
+      Your data <strong>never leaves your device</strong>. Everything runs locally in Safari.
+    </div>
+
+    <div class="card">
+      <div class="card-label">— Step 1 of 2 · Select contacts</div>
+      <button class="btn btn-primary" id="btn-pick">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Open Contact Picker
+      </button>
+    </div>
+
+    <div class="card" id="browser-warn" style="display:none">
+      <div class="notice notice-warn">
+        <strong>Unsupported browser.</strong> The Contact Picker API requires <strong>Safari on iOS 14.5+</strong>. Open this page in Safari on your iPhone.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Step 2: Preview & export ── -->
+  <div id="step-preview" class="step hidden">
+    <div class="stat-bar" id="stat-bar"></div>
+
+    <div class="card">
+      <div class="card-label">— Preview</div>
+      <div class="search-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="search-input" placeholder="Search contacts…" />
+      </div>
+      <div class="contact-list" id="contact-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">— CSV preview (first 3 rows)</div>
+      <div class="csv-preview" id="csv-preview"></div>
+    </div>
+
+    <button class="btn btn-export" id="btn-export">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download CSV
+    </button>
+
+    <button class="btn btn-secondary" id="btn-reset" style="margin-top:8px">
+      ← Pick again
+    </button>
+  </div>
+
+  <footer>All processing is local · No data sent anywhere</footer>
+</div>
+
+<script>
+  // ── State ──
+  let allContacts = [];
+  let filtered    = [];
+
+  // ── Elements ──
+  const stepPick    = document.getElementById('step-pick');
+  const stepPreview = document.getElementById('step-preview');
+  const btnPick     = document.getElementById('btn-pick');
+  const btnExport   = document.getElementById('btn-export');
+  const btnReset    = document.getElementById('btn-reset');
+  const searchInput = document.getElementById('search-input');
+  const contactList = document.getElementById('contact-list');
+  const csvPreview  = document.getElementById('csv-preview');
+  const statBar     = document.getElementById('stat-bar');
+  const browserWarn = document.getElementById('browser-warn');
+
+  // ── Check API support ──
+  function isSupported() {
+    return 'contacts' in navigator && 'ContactsManager' in window;
+  }
+
+  if (!isSupported()) {
+    browserWarn.style.display = 'block';
+    btnPick.disabled = true;
+    btnPick.textContent = 'Not supported in this browser';
+  }
+
+  // ── Pick contacts ──
+  btnPick.addEventListener('click', async () => {
+    if (!isSupported()) return;
+
+    const props = ['name', 'tel', 'email', 'address'];
+    const opts  = { multiple: true };
+
+    try {
+      btnPick.disabled = true;
+      btnPick.innerHTML = '<span class="spinner"></span> Opening picker…';
+
+      const results = await navigator.contacts.select(props, opts);
+
+      if (!results || results.length === 0) {
+        btnPick.disabled = false;
+        btnPick.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Open Contact Picker`;
+        return;
+      }
+
+      allContacts = results.map(normalise);
+      filtered    = [...allContacts];
+      showPreview();
+
+    } catch (err) {
+      alert('Could not open contacts: ' + err.message);
+      btnPick.disabled = false;
+      btnPick.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Open Contact Picker`;
+    }
+  });
+
+  // ── Normalise a raw contact ──
+  function normalise(raw) {
+    const name = (raw.name && raw.name[0]) ? raw.name[0].trim() : '';
+    const phones = (raw.tel   || []).map(t => (typeof t === 'string' ? t : t.value || '').trim()).filter(Boolean);
+    const emails = (raw.email || []).map(e => (typeof e === 'string' ? e : e.value || '').trim()).filter(Boolean);
+    const addresses = (raw.address || []).map(a => {
+      if (typeof a === 'string') return a.trim();
+      return [a.addressLine?.join(', '), a.city, a.region, a.postalCode, a.country]
+        .flat().filter(Boolean).join(', ').trim();
+    }).filter(Boolean);
+
+    return { name, phones, emails, addresses };
+  }
+
+  // ── Show preview step ──
+  function showPreview() {
+    stepPick.classList.add('hidden');
+    stepPreview.classList.remove('hidden');
+    renderStats();
+    renderList();
+    renderCsvPreview();
+  }
+
+  // ── Stats ──
+  function renderStats() {
+    const phones   = allContacts.filter(c => c.phones.length > 0).length;
+    const emails   = allContacts.filter(c => c.emails.length > 0).length;
+    statBar.innerHTML = `
+      <div class="stat"><div class="stat-num">${allContacts.length}</div><div class="stat-lbl">Contacts</div></div>
+      <div class="stat"><div class="stat-num">${phones}</div><div class="stat-lbl">w/ Phone</div></div>
+      <div class="stat"><div class="stat-num">${emails}</div><div class="stat-lbl">w/ Email</div></div>
+    `;
+  }
+
+  // ── Contact list ──
+  function renderList() {
+    contactList.innerHTML = '';
+    const list = filtered.length ? filtered : allContacts;
+    list.forEach((c, i) => {
+      const initials = (c.name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+      const detail   = c.phones[0] || c.emails[0] || c.addresses[0] || '—';
+      const div = document.createElement('div');
+      div.className = 'contact-item';
+      div.style.animationDelay = Math.min(i * 20, 400) + 'ms';
+      div.innerHTML = `
+        <div class="avatar">${initials}</div>
+        <div class="contact-info">
+          <div class="name">${esc(c.name || '(No name)')}</div>
+          <div class="detail">${esc(detail)}</div>
+        </div>`;
+      contactList.appendChild(div);
+    });
+    if (!list.length) {
+      contactList.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted)">No matches</div>';
+    }
+  }
+
+  // ── CSV table preview ──
+  function renderCsvPreview() {
+    const headers = ['Name','Phone 1','Phone 2','Email 1','Email 2','Address 1'];
+    const rows    = allContacts.slice(0, 3);
+    const thead   = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>`;
+    const tbody   = `<tbody>${rows.map(c => `<tr>
+      <td>${esc(c.name)}</td>
+      <td>${esc(c.phones[0]||'')}</td>
+      <td>${esc(c.phones[1]||'')}</td>
+      <td>${esc(c.emails[0]||'')}</td>
+      <td>${esc(c.emails[1]||'')}</td>
+      <td>${esc(c.addresses[0]||'')}</td>
+    </tr>`).join('')}</tbody>`;
+    csvPreview.innerHTML = `<table>${thead}${tbody}</table>`;
+  }
+
+  // ── Search ──
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase();
+    filtered = q
+      ? allContacts.filter(c =>
+          c.name.toLowerCase().includes(q) ||
+          c.phones.join(' ').includes(q) ||
+          c.emails.join(' ').toLowerCase().includes(q)
+        )
+      : [...allContacts];
+    renderList();
+  });
+
+  // ── CSV generation & download ──
+  function csvEscape(val) {
+    const s = (val ?? '').toString();
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function generateCSV() {
+    const header = ['Name','Phone 1','Phone 2','Email 1','Email 2','Address 1','Address 2'];
+    const rows   = allContacts.map(c => [
+      c.name,
+      c.phones[0]    || '',
+      c.phones[1]    || '',
+      c.emails[0]    || '',
+      c.emails[1]    || '',
+      c.addresses[0] || '',
+      c.addresses[1] || '',
+    ].map(csvEscape).join(','));
+    return [header.join(','), ...rows].join('\n');
+  }
+
+  btnExport.addEventListener('click', () => {
+    const csv  = generateCSV();
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const ts   = new Date().toISOString().slice(0,10);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `contacts_${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // Feedback
+    const orig = btnExport.innerHTML;
+    btnExport.innerHTML = '✓ Downloaded!';
+    btnExport.style.background = 'var(--accent)';
+    setTimeout(() => { btnExport.innerHTML = orig; btnExport.style.background = ''; }, 2500);
+  });
+
+  // ── Reset ──
+  btnReset.addEventListener('click', () => {
+    allContacts = [];
+    filtered    = [];
+    searchInput.value = '';
+    stepPreview.classList.add('hidden');
+    stepPick.classList.remove('hidden');
+    btnPick.disabled = false;
+    btnPick.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Open Contact Picker`;
+  });
+
+  // ── Helpers ──
+  function esc(s) {
+    return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

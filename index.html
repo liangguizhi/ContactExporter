@@ -503,10 +503,14 @@
       // Ask the browser which properties it actually supports, then request only those.
       // This avoids a TypeError on iOS Safari which rejects unsupported props.
       const supported = await navigator.contacts.getProperties();
+      alert('Supported props: ' + JSON.stringify(supported));
       const want      = ['name', 'tel', 'email', 'address', 'organization'];
       const props     = want.filter(p => supported.includes(p));
 
       const results = await navigator.contacts.select(props, opts);
+      if (results && results.length > 0) {
+        alert('Raw keys: ' + Object.keys(results[0]).join(', ') + '\norganization: ' + JSON.stringify(results[0].organization));
+      }
 
       if (!results || results.length === 0) {
         btnPick.disabled = false;

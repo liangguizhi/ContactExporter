@@ -483,12 +483,17 @@
   btnPick.addEventListener('click', async () => {
     if (!isSupported()) return;
 
-    const props = ['name', 'tel', 'email', 'address'];
     const opts  = { multiple: true };
 
     try {
       btnPick.disabled = true;
       btnPick.innerHTML = '<span class="spinner"></span> Opening picker…';
+
+      // Ask the browser which properties it actually supports, then request only those.
+      // This avoids a TypeError on iOS Safari which rejects unsupported props.
+      const supported = await navigator.contacts.getProperties();
+      const want      = ['name', 'tel', 'email', 'address'];
+      const props     = want.filter(p => supported.includes(p));
 
       const results = await navigator.contacts.select(props, opts);
 
